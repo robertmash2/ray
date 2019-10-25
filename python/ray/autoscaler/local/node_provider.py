@@ -91,9 +91,13 @@ class LocalNodeProvider(NodeProvider):
     """
 
     def __init__(self, provider_config, cluster_name):
+        print('initializing monkey patched instance of class LocalNodeProvider')
         NodeProvider.__init__(self, provider_config, cluster_name)
-        self.state = ClusterState("/tmp/cluster-{}.lock".format(cluster_name),
-                                  "/tmp/cluster-{}.state".format(cluster_name),
+        if not os.path.exists(os.path.expanduser('~/tempfiles')):
+            os.mkdir(os.path.expanduser('~/tempfiles'))
+
+        self.state = ClusterState(os.path.expanduser("~/tempfiles/cluster-{}.lock".format(cluster_name)),
+                                  os.path.expanduser("~/tempfiles/cluster-{}.state".format(cluster_name)),
                                   provider_config)
 
     def non_terminated_nodes(self, tag_filters):

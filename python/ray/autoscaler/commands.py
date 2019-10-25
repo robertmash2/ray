@@ -169,6 +169,7 @@ def monitor_cluster(cluster_config_file, num_lines, override_cluster_name):
 def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
                             override_cluster_name):
     """Create the cluster head node, which in turn creates the workers."""
+    print('executing monkey patched get_or_create_head_node')
     provider = get_node_provider(config["provider"], config["cluster_name"])
     try:
         head_node_tags = {
@@ -211,7 +212,10 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
         logger.info("get_or_create_head_node: Updating files on head node...")
 
         # Rewrite the auth config so that the head node can update the workers
-        remote_key_path = "~/ray_bootstrap_key.pem"
+        auth_path = os.path.join(os.path.expanduser('~'), config['cluster_name'])
+        if not os.path.exists(auth_path):
+            os.mkdir(auth_path)
+        remote_key_path = os.path.join(auth_path, "ray_bootstrap_key.pem")
         remote_config = copy.deepcopy(config)
         remote_config["auth"]["ssh_private_key"] = remote_key_path
 
@@ -229,7 +233,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
         remote_config_file.flush()
         config["file_mounts"].update({
             remote_key_path: config["auth"]["ssh_private_key"],
-            "~/ray_bootstrap_config.yaml": remote_config_file.name
+            auth_path + "/ray_bootstrap_config"+".yaml": remote_config_file.name
         })
 
         if restart_only:
@@ -270,7 +274,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
             "get_or_create_head_node: "
             "Head node up-to-date, IP address is: {}".format(head_node_ip))
 
-        monitor_str = "tail -n 100 -f /tmp/ray/session_*/logs/monitor*"
+        monitor_str = "tail -n 100 -f ~/ray_tmp/ray/session_*/logs/monitor*"
         use_docker = bool(config["docker"]["container_name"])
         if override_cluster_name:
             modifiers = " --cluster-name={}".format(
