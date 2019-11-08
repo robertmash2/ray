@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # How long to wait for a node to start, in seconds
 NODE_START_WAIT_S = 300
 SSH_CHECK_INTERVAL = 5
-HASH_MAX_LENGTH = 10
+HASH_MAX_LENGTH =5
 
 
 def get_default_ssh_options(private_key, connect_timeout, ssh_control_path):
@@ -54,13 +54,14 @@ class NodeUpdater(object):
                  initialization_commands,
                  setup_commands,
                  runtime_hash,
+                 ray_tmp='/tmp',
                  process_runner=subprocess,
                  exit_on_update_fail=False,
                  use_internal_ip=False):
 
         ssh_control_hash = hashlib.md5(cluster_name.encode()).hexdigest()
         ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()
-        ssh_control_path = "/tmp/ray_ssh_{}/{}".format(
+        ssh_control_path = ray_tmp+"/{}/{}".format(
             ssh_user_hash[:HASH_MAX_LENGTH],
             ssh_control_hash[:HASH_MAX_LENGTH])
 
@@ -72,7 +73,13 @@ class NodeUpdater(object):
         self.provider = provider
         self.ssh_private_key = auth_config["ssh_private_key"]
         self.ssh_user = auth_config["ssh_user"]
-        self.ssh_control_path = ssh_control_path
+        # if not os.path.exists(ssh_control_path):
+        #     os.makedirs(ssh_control_path)
+        #
+        # if os.path.exists('/dev/shm/_sl'):
+        #     os.remove('/dev/shm/_sl')
+        # os.symlink(ssh_control_path, '/dev/shm/_sl')
+        self.ssh_control_path = ssh_control_path  # '/dev/shm/_sl'  # ssh_control_path
         self.ssh_ip = None
         self.file_mounts = {
             remote: os.path.expanduser(local)

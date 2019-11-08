@@ -7,6 +7,7 @@ import jsonschema
 import logging
 import os
 from shutil import copyfile
+from shutil import copyfile
 import subprocess
 import sys
 import time
@@ -200,7 +201,7 @@ class SessionRunner(object):
 
             # Create a temporary requirements_txt in the head node.
             remote_requirements_txt = (
-                "/tmp/" + "ray_project_requirements_txt_{}".format(
+                os.path.expanduser("/tmp/") + "ray_project_requirements_txt_{}".format(
                     time.time()))
 
             rsync(

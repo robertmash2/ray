@@ -42,6 +42,9 @@ CLUSTER_CONFIG_SCHEMA = {
     # An unique identifier for the head node and workers of this cluster.
     "cluster_name": (str, REQUIRED),
 
+    # Default location for ray temporary files.  Default is "/tmp".
+    "ray_tmp": (str, OPTIONAL),
+
     # The minimum number of workers nodes to launch in addition to the head
     # node. This number should be >= 0.
     "min_workers": (int, OPTIONAL),
@@ -394,7 +397,8 @@ class StandardAutoscaler(object):
         self.reload_config(errors_fatal=True)
         self.load_metrics = load_metrics
         self.provider = get_node_provider(self.config["provider"],
-                                          self.config["cluster_name"])
+                                          self.config["cluster_name"],
+                                          self.config['ray_tmp'])
 
         self.max_failures = max_failures
         self.max_launch_batch = max_launch_batch
@@ -652,7 +656,8 @@ class StandardAutoscaler(object):
                 self.config["worker_start_ray_commands"]),
             runtime_hash=self.runtime_hash,
             process_runner=self.process_runner,
-            use_internal_ip=True)
+            use_internal_ip=True,
+            ray_tmp=self.config['ray_tmp'])
         updater.start()
         self.updaters[node_id] = updater
 
@@ -687,7 +692,8 @@ class StandardAutoscaler(object):
             setup_commands=with_head_node_ip(init_commands),
             runtime_hash=self.runtime_hash,
             process_runner=self.process_runner,
-            use_internal_ip=True)
+            use_internal_ip=True,
+            ray_tmp=self.config['ray_tmp'])
         updater.start()
         self.updaters[node_id] = updater
 

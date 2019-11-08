@@ -225,6 +225,13 @@ def cli(logging_level, logging_format):
     is_flag=True,
     default=False,
     help="Specify whether load code from local file or GCS serialization.")
+@click.option(
+    "--ray_tmp",
+    "-rt",
+    required=False,
+    type=str,
+    default='/tmp',
+    help="Specify temporary files location.  Default is /tmp.")
 def start(node_ip_address, redis_address, address, redis_port,
           num_redis_shards, redis_max_clients, redis_password,
           redis_shard_ports, object_manager_port, node_manager_port, memory,
@@ -232,7 +239,7 @@ def start(node_ip_address, redis_address, address, redis_port,
           head, include_webui, block, plasma_directory, huge_pages,
           autoscaling_config, no_redirect_worker_output, no_redirect_output,
           plasma_store_socket_name, raylet_socket_name, temp_dir, include_java,
-          java_worker_options, load_code_from_local, internal_config):
+          java_worker_options, load_code_from_local, internal_config, ray_tmp):
     # Convert hostnames to numerical IP address.
     if node_ip_address is not None:
         node_ip_address = services.address_to_ip(node_ip_address)
@@ -277,7 +284,9 @@ def start(node_ip_address, redis_address, address, redis_port,
         include_webui=include_webui,
         java_worker_options=java_worker_options,
         load_code_from_local=load_code_from_local,
-        _internal_config=internal_config)
+        _internal_config=internal_config,
+        ray_tmp=ray_tmp
+    )
 
     if head:
         # Start Ray on the head node.
@@ -482,6 +491,8 @@ def stop():
     is_flag=True,
     default=False,
     help="Don't ask for confirmation.")
+
+
 def create_or_update(cluster_config_file, min_workers, max_workers, no_restart,
                      restart_only, yes, cluster_name):
     """Create or update a Ray cluster."""
@@ -774,7 +785,7 @@ def timeline(redis_address):
     logger.info("Connecting to Ray instance at {}.".format(redis_address))
     ray.init(redis_address=redis_address)
     time = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = "/tmp/ray-timeline-{}.json".format(time)
+    filename = os.path.expanduser("/tmp/ray-timeline-{}.json".format(time))
     ray.timeline(filename=filename)
     size = os.path.getsize(filename)
     logger.info("Trace file written to {} ({} bytes).".format(filename, size))

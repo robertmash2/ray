@@ -90,14 +90,15 @@ class LocalNodeProvider(NodeProvider):
     `node_id` is overloaded to also be `node_ip` in this class.
     """
 
-    def __init__(self, provider_config, cluster_name):
-        print('initializing monkey patched instance of class LocalNodeProvider')
+    def __init__(self, provider_config, cluster_name, ray_tmp='/tmp'):
         NodeProvider.__init__(self, provider_config, cluster_name)
-        if not os.path.exists(os.path.expanduser('~/tempfiles')):
-            os.mkdir(os.path.expanduser('~/tempfiles'))
+        self.ray_tmp = ray_tmp
+        temp_path = os.path.expanduser(self.ray_tmp)
+        if not os.path.exists(temp_path):
+            os.mkdir(temp_path)
 
-        self.state = ClusterState(os.path.expanduser("~/tempfiles/cluster-{}.lock".format(cluster_name)),
-                                  os.path.expanduser("~/tempfiles/cluster-{}.state".format(cluster_name)),
+        self.state = ClusterState(os.path.join(temp_path, 'cluster-{}.lock'.format(cluster_name)),
+                                  os.path.join(temp_path, 'cluster-{}.state'.format(cluster_name)),
                                   provider_config)
 
     def non_terminated_nodes(self, tag_filters):

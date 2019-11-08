@@ -47,6 +47,7 @@ class Node(object):
                  head=False,
                  shutdown_at_exit=True,
                  connect_only=False):
+
         """Start a node.
 
         Args:
@@ -84,7 +85,7 @@ class Node(object):
             include_log_monitor=True,
             resources={},
             include_webui=False,
-            temp_dir="/tmp/ray",
+            temp_dir=ray_params.ray_tmp,
             worker_path=os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 "workers/default_worker.py"))
@@ -323,7 +324,7 @@ class Node(object):
         """Get the path of the sockets directory."""
         return self._sockets_dir
 
-    def _make_inc_temp(self, suffix="", prefix="", directory_name="/tmp/ray"):
+    def _make_inc_temp(self, suffix="", prefix="", directory_name='/tmp'):
         """Return a incremental temporary file name. The file is not created.
 
         Args:

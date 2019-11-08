@@ -121,7 +121,7 @@ class Reporter(object):
 
     @staticmethod
     def get_disk_usage():
-        return {x: psutil.disk_usage(x) for x in ["/", "/tmp"]}
+        return {x: psutil.disk_usage(x) for x in ["/", '/tmp']}
 
     @staticmethod
     def get_workers():

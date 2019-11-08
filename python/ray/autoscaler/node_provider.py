@@ -89,7 +89,7 @@ def load_class(path):
     return getattr(module, class_str)
 
 
-def get_node_provider(provider_config, cluster_name):
+def get_node_provider(provider_config, cluster_name, ray_tmp='/tmp'):
     if provider_config["type"] == "external":
         provider_cls = load_class(path=provider_config["module"])
         return provider_cls(provider_config, cluster_name)
@@ -100,7 +100,7 @@ def get_node_provider(provider_config, cluster_name):
         raise NotImplementedError("Unsupported node provider: {}".format(
             provider_config["type"]))
     _, provider_cls = importer()
-    return provider_cls(provider_config, cluster_name)
+    return provider_cls(provider_config, cluster_name, ray_tmp=ray_tmp)
 
 
 def get_default_config(provider_config):
@@ -128,9 +128,10 @@ class NodeProvider(object):
     immediately to terminated when `terminate_node` is called.
     """
 
-    def __init__(self, provider_config, cluster_name):
+    def __init__(self, provider_config, cluster_name, ray_tmp='/tmp'):
         self.provider_config = provider_config
         self.cluster_name = cluster_name
+        self.ray_tmp = ray_tmp
 
     def non_terminated_nodes(self, tag_filters):
         """Return a list of node ids filtered by the specified tags dict.

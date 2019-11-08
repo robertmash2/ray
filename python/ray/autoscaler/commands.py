@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def create_or_update_cluster(config_file, override_min_workers,
                              override_max_workers, no_restart, restart_only,
-                             yes, override_cluster_name):
+                             yes, override_cluster_name, ray_tmp='/tmp'):
     """Create or updates an autoscaling Ray cluster from a config json."""
     config = yaml.safe_load(open(config_file).read())
     if override_min_workers is not None:
@@ -42,6 +42,9 @@ def create_or_update_cluster(config_file, override_min_workers,
         config["max_workers"] = override_max_workers
     if override_cluster_name is not None:
         config["cluster_name"] = override_cluster_name
+    if 'ray_tmp' not in config.keys():
+        config['ray_tmp'] = ray_tmp
+    config['ray_tmp'] = os.path.expanduser(config['ray_tmp'])
     config = _bootstrap_config(config)
     get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
                             override_cluster_name)
@@ -52,7 +55,10 @@ def _bootstrap_config(config):
 
     hasher = hashlib.sha1()
     hasher.update(json.dumps([config], sort_keys=True).encode("utf-8"))
-    cache_key = os.path.join(tempfile.gettempdir(),
+    if not os.path.exists(config['ray_tmp']):
+        os.makedirs(config['ray_tmp'])
+
+    cache_key = os.path.join(config['ray_tmp'],
                              "ray-config-{}".format(hasher.hexdigest()))
     if os.path.exists(cache_key):
         return json.loads(open(cache_key).read())
@@ -81,7 +87,7 @@ def teardown_cluster(config_file, yes, workers_only, override_cluster_name):
 
     confirm("This will destroy your cluster", yes)
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
 
     try:
 
@@ -126,7 +132,7 @@ def kill_node(config_file, yes, hard, override_cluster_name):
 
     confirm("This will kill a node in your cluster", yes)
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         nodes = provider.non_terminated_nodes({TAG_RAY_NODE_TYPE: "worker"})
         node = random.choice(nodes)
@@ -143,7 +149,8 @@ def kill_node(config_file, yes, hard, override_cluster_name):
                 file_mounts=config["file_mounts"],
                 initialization_commands=[],
                 setup_commands=[],
-                runtime_hash="")
+                runtime_hash="",
+                ray_tmp=config['ray_tmp'])
 
             _exec(updater, "ray stop", False, False)
 
@@ -169,8 +176,7 @@ def monitor_cluster(cluster_config_file, num_lines, override_cluster_name):
 def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
                             override_cluster_name):
     """Create the cluster head node, which in turn creates the workers."""
-    print('executing monkey patched get_or_create_head_node')
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config['cluster_name'], ray_tmp=config['ray_tmp'])
     try:
         head_node_tags = {
             TAG_RAY_NODE_TYPE: "head",
@@ -212,7 +218,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
         logger.info("get_or_create_head_node: Updating files on head node...")
 
         # Rewrite the auth config so that the head node can update the workers
-        auth_path = os.path.join(os.path.expanduser('~'), config['cluster_name'])
+        auth_path = os.path.join(config['ray_tmp'], config['cluster_name'])
         if not os.path.exists(auth_path):
             os.mkdir(auth_path)
         remote_key_path = os.path.join(auth_path, "ray_bootstrap_key.pem")
@@ -228,7 +234,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
 
         # Now inject the rewritten config and SSH key into the head node
         remote_config_file = tempfile.NamedTemporaryFile(
-            "w", prefix="ray-bootstrap-")
+            "w", prefix="ray-bootstrap-", dir=auth_path)
         remote_config_file.write(json.dumps(remote_config))
         remote_config_file.flush()
         config["file_mounts"].update({
@@ -254,6 +260,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
             initialization_commands=config["initialization_commands"],
             setup_commands=init_commands,
             runtime_hash=runtime_hash,
+            ray_tmp=config['ray_tmp']
         )
         updater.start()
         updater.join()
@@ -274,7 +281,7 @@ def get_or_create_head_node(config, config_file, no_restart, restart_only, yes,
             "get_or_create_head_node: "
             "Head node up-to-date, IP address is: {}".format(head_node_ip))
 
-        monitor_str = "tail -n 100 -f ~/ray_tmp/ray/session_*/logs/monitor*"
+        monitor_str = "tail -n 100 -f /tmp/ray/session_*/logs/monitor*"
         use_docker = bool(config["docker"]["container_name"])
         if override_cluster_name:
             modifiers = " --cluster-name={}".format(
@@ -347,7 +354,7 @@ def exec_cluster(config_file, cmd, docker, screen, tmux, stop, start,
     head_node = _get_head_node(
         config, config_file, override_cluster_name, create_if_needed=start)
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         updater = NodeUpdaterThread(
             node_id=head_node,
@@ -359,6 +366,7 @@ def exec_cluster(config_file, cmd, docker, screen, tmux, stop, start,
             initialization_commands=[],
             setup_commands=[],
             runtime_hash="",
+            ray_tmp=config['ray_tmp']
         )
 
         def wrap_docker(command):
@@ -440,7 +448,7 @@ def rsync(config_file, source, target, override_cluster_name, down):
     head_node = _get_head_node(
         config, config_file, override_cluster_name, create_if_needed=False)
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         updater = NodeUpdaterThread(
             node_id=head_node,
@@ -452,6 +460,7 @@ def rsync(config_file, source, target, override_cluster_name, down):
             initialization_commands=[],
             setup_commands=[],
             runtime_hash="",
+            ray_tmp=config['ray_tmp']
         )
         if down:
             rsync = updater.rsync_down
@@ -474,7 +483,7 @@ def get_head_node_ip(config_file, override_cluster_name):
     if override_cluster_name is not None:
         config["cluster_name"] = override_cluster_name
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         head_node = _get_head_node(config, config_file, override_cluster_name)
         if config.get("provider", {}).get("use_internal_ips", False) is True:
@@ -494,7 +503,7 @@ def get_worker_node_ips(config_file, override_cluster_name):
     if override_cluster_name is not None:
         config["cluster_name"] = override_cluster_name
 
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         nodes = provider.non_terminated_nodes({TAG_RAY_NODE_TYPE: "worker"})
 
@@ -510,7 +519,7 @@ def _get_head_node(config,
                    config_file,
                    override_cluster_name,
                    create_if_needed=False):
-    provider = get_node_provider(config["provider"], config["cluster_name"])
+    provider = get_node_provider(config["provider"], config["cluster_name"], ray_tmp=config['ray_tmp'])
     try:
         head_node_tags = {
             TAG_RAY_NODE_TYPE: "head",

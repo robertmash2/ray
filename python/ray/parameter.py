@@ -113,7 +113,8 @@ class RayParams(object):
                  include_java=False,
                  java_worker_options=None,
                  load_code_from_local=False,
-                 _internal_config=None):
+                 _internal_config=None,
+                 ray_tmp='/tmp'):
         self.object_id_seed = object_id_seed
         self.redis_address = redis_address
         self.num_cpus = num_cpus
@@ -148,7 +149,7 @@ class RayParams(object):
         self.load_code_from_local = load_code_from_local
         self._internal_config = _internal_config
         self._check_usage()
-
+        self.ray_tmp = ray_tmp
     def update(self, **kwargs):
         """Update the settings according to the keyword arguments.
 
